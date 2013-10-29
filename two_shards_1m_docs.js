@@ -28,5 +28,5 @@ sh.shardCollection("chunkTest.foo", {"_id" : 1});
 sh.getBalancerState();
 // Now insert 1,000,000 docs (increase as necessary) - this may take a while
 // In this case, I've put in a couple of random fields, and overridden the _id with the integer counter in the for loop
-for(var i = 0; i <= 1000000; i++){db.UserIdentity.insert({"_id" : i, "date" : new Date(), "otherID" : new ObjectId()})};
+for(var i = 0; i <= 1000000; i++){db.foo.insert({"_id" : i, "date" : new Date(), "otherID" : new ObjectId()})};
 // and that's it - you now have a 2 shard cluster with 1,000,000 docs to play with
