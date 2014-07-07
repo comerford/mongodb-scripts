@@ -10,13 +10,13 @@
 sh.printAllChunkInfo = function(ns, est) {
     var configDB = db.getSiblingDB("config");
     var chunks = configDB.chunks.find({ns: ns}).sort({min: 1});
+	var key = configDB.collections.findOne({_id: ns}).key;
     var totalChunks = 0;
     var totalSize = 0;
     var totalEmpty = 0;
     print("ChunkID,Shard,ChunkSize,ObjectsInChunk");
     chunks.forEach( function printChunkInfo(chunk) {
 		var db1 = db.getSiblingDB(chunk.ns.split(".")[0]);
-		var key = configDB.collections.findOne({_id: chunk.ns}).key;
 		var res = db1.runCommand({ datasize: chunk.ns, keyPattern: key, min: chunk.min, max: chunk.max, estimate: est });
 		print(chunk._id + "," + chunk.shard + "," + res.size + "," + res.numObjects);
 		totalSize += res.size;
