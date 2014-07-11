@@ -15,7 +15,7 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     # Uncomment the next line to show VM window. User/pass = vagrant/vagrant
     vb.gui = true
   
-    vb.name = "MongoDBU"
+    vb.name = "MongoDBU_vm"
     vb.customize ["modifyvm", :id, "--memory", "2048"]
     vb.customize ["modifyvm", :id, "--cpus", "1"]  
   end
