@@ -6,7 +6,7 @@ VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   
-  config.vm.box = "MongoDBU"
+  config.vm.box = "MongoDBU_vm"
   config.vm.box_url = "http://mekhar/mongodbu.box"
 
   config.vm.provision "shell", path: "provisioners/setup.sh"
