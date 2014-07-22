@@ -1,7 +1,11 @@
-// 
+// Some functions for inserting quickly (unack'ed writes) (Create)
+// Preheating data to get it into memory (Read)
+// Changing the data, with/without growth (Update)
+// Removing data (Delete)
 
-// first function is used to create a random set of data, the C in CRUD
-// takes 3 arguments:
+// First function is used to create a random set of data, the C in CRUD
+// Defaults/Assumptions: _id index only, collection always called "data"
+// Takes 3 arguments:
 // numGB is the approximate data size to create in GiB (integer usually, but any number should work)
 // dbName is the database to use (defaults to a collection called data)
 // usePowerOf2 is a boolean to allow you to select the storage strategy
@@ -69,16 +73,21 @@ createData = function(numGB, dbName, usePowerOf2) {
 
 
 // Next, the reads - we'll do this randomly across the set
+// Takes 2 arguments:
+// numGB is the approximate data size to create in GiB (integer usually, but any number should work)
+// dbName is the database to use (defaults to a collection called data)
 
 preHeatRandomData = function(numGB, dbName) {
 
 // We will brute force this basically, the _id is indexed and we know how it was constructed
-// The first 8 hex digits of the psuedo ObjectID we created have a maximum of 16^6 docs, but likely far less
-// A bit of experimentation tells me that using all 8 digits is too slow for smaller data sets (low hit rate)
-// Hence, we will do a range query using the first 6 digits plus fixed strings to create the start/end of the range
+// The first 8 hex digits of the pseudo ObjectID we created have a maximum of 16^6 docs, but likely far less
+// A bit of experimentation tells me that using all 8 digits is too slow (low hit rate)
+// Even 6 digits is still only 256 second ranges and yielded an average of less than 2 docs per range in limited tests
+// Hence, we will do a range query using the first 5 digits plus fixed strings to create the start/end of the range
+// Thats 16^3 or 4096 secs, so not an unreasonable range to query in general (1GiB set tests yielded ~12 docs per range)
 // Every time we do the range query, we will call explain, and then increment the results by the nscanned count
 // 
-// Note: decent chance with small data sets, some collisions in the random number that there will be overlap happening
+// Note: decent chance there will be collisions, so may need to "oversubscribe" the amount of data to be touched
 
 var docHits = 0;
 var noHits = 0;
@@ -91,11 +100,11 @@ while(docHits < (5000000 * numGB)) {
 	// the creation of the string is identical to the creation code
     var randomNum = Math.random();
     var ranString = (Math.floor(randomNum * 1500000000).toString(16)).pad(8, false, 0);
-    // we just strip the last 2 characters to allow us to create ranges
-    ranString = ranString.substring(0, ranString.length - 2)
-    var beginId = new ObjectId(ranString + "00adacefd123000000");
-    var endId = new ObjectId(ranString + "ffadacefd123ffffff");                  
-    // simple ranged query on _id, with an explain so we exhaust the cursor and determine the number of docs scanned
+    // we just strip the last 2 characters to allow us to create ranges - 3 characters is only 4096 seconds
+    ranString = ranString.substring(0, ranString.length - 3)
+    var beginId = new ObjectId(ranString + "000adacefd123000000");
+    var endId = new ObjectId(ranString + "fffadacefd123ffffff");                  
+    // simple ranged query on _id with an explicit hint and an explain so we exhaust the cursor and get useful stats back
     var result = db1.data.find({_id : {$gte : beginId, $lte : endId}}).hint({_id : 1}).explain();
     if(result.nscanned > 0) { 
         docHits += result.nscanned; //increment by number of scanned if not empty
@@ -103,16 +112,16 @@ while(docHits < (5000000 * numGB)) {
         noHits++;  // record the lack of hits
     };
     iterations++; // total iterations
-    // warn about low hit rates
+    // warn about low hit rates at each 250k no hit occurrences
 	if((noHits % 250000) == 0  && noHits > 0){
         print("Warning: hit rate is poor - just passed " + noHits + " iterations with no hits (current hits doc hits are: " + docHits + " out of " + (5000000 * numGB) + " or " + docHits/(50000 * numGB) + "%).");
 	};
 };
 endTime = new Date();
 // some info on the time taken, hit rate etc.
-print(numGB + "GiB of data loaded (" + (numGB * 5000000) + " docs), took " + (endTime - startTime)/1000 + " seconds to complete (average: " + (numGB * 5000000)/((endTime - startTime)/1000) + " docs/sec), with " + noHits + " queries not hitting any docs (" + (noHits*100)/iterations + "%) and " + iterations + " total iterations" );
+print(numGB + "GiB of data loaded (" + (numGB * 5000000) + " docs), took " + (endTime - startTime)/1000 + " seconds to complete (average: " + (numGB * 5000000)/((endTime - startTime)/1000) + " docs/sec)")
+print(noHits + " queries hit 0 documents (" + (noHits*100)/iterations + "%) and there were " + iterations + " total iterations." );
 print("Average number of docs scanned per iteration (hits only): " + (numGB * 5000000)/(iterations - noHits) );
-
 };
 
 // update docs, make them grow
