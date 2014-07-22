@@ -42,7 +42,7 @@ createData = function(numGB, dbName, usePowerOf2) {
         };
         db1.data.insert(bigDoc);
     
-        if(j == (numGB * 68){
+        if(j == (numGB * 68)){
             print("Approximately 50% done: " + (j * 34200) + " docs inserted in " + (new Date() - StartTime)/1000 + " seconds");
         };
     
