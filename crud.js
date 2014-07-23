@@ -134,7 +134,7 @@ updateRandomData = function(numGB, dbName, growDocs){
 
 // quick test shows that with powerOf2Sizes, need to add 9 ObjectIds to the smallArray to trigger a move
 // so growing the docs will take a lot more updates in order to complete the run
-// testing for a move is a little clunky, but basically do a push, check the diskLoc
+// testing for a move is a little clunky until we get better write command stats, so pushing that to its own function for now
 var db1 = db.getSiblingDB(dbName);
 var updateHits = 0;
 var growthOverhead = 0;
@@ -154,7 +154,7 @@ while(updateHits < (5000000 * numGB)){
         result = db1.data.find({_id : {$gte : beginId, $lte : endId}, ranInt : {$lte : 1000000}}).hint({_id : 1}).next();
     }
     if(growDocs){
-        growthOverhead += pushUntilMoved(genTest, result._id, false);
+        growthOverhead += pushUntilMoved(dbName, result._id, false);
         db1.data.update({_id : result._id}, {$inc : {ranInt : 1000000}});
         updateHits++;
     } else {
