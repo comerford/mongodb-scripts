@@ -62,7 +62,11 @@ createData = function(numGB, dbName, usePowerOf2) {
     
     };
     var timeTaken = ((new Date() - startTime)/1000);
-    print("Run complete: " + (numGB * 68 * 66400) + " docs inserted in " + timeTaken + " seconds.  Average insertion rate: " + ((numGB * 136 * 33200)/timeTaken) + " docs per second");    
+    print("Run complete: " + (numGB * 68 * 66400) + " docs inserted in " + timeTaken + " seconds.  Average insertion rate: " + ((numGB * 136 * 33200)/timeTaken) + " docs per second");
+    // clean up the write mode if altered at the top
+    if(db1.getMongo().writeMode() == "legacy"){
+	    db1.getMongo().forceWriteMode("commands"); 
+    }    
 };
 
 // Sample runs of the createData script on a standalone mongod, both run on same 8 core Linux host, not IO bound 
@@ -124,6 +128,54 @@ print(noHits + " queries hit 0 documents (" + (noHits*100)/iterations + "%) and 
 print("Average number of docs scanned per iteration (hits only): " + (numGB * 5000000)/(iterations - noHits) );
 };
 
-// update docs, make them grow
+// update docs, optionally making them grow (creates free list)
 
-// delete docs, create holes
+updateRandomData = function(numGB, dbName, growDocs){
+
+// quick test shows that with powerOf2Sizes, need to add 9 ObjectIds to the smallArray to trigger a move
+// testing for a move is a little clunky, but basically do a push, check the diskLoc
+var db1 = db.getSiblingDB(dbName);
+
+var startTime = new Date(); // time the loop
+
+while(updateHits < (5000000 * numGB)){
+    // we'll re-use the logic from the finds, create a range to look for a candidate document
+    var randomNum = Math.random();
+    var ranString = (Math.floor(randomNum * 1500000000).toString(16)).pad(8, false, 0);
+    // we just strip the last 3 characters to allow us to create ranges - 3 characters is only 4096 seconds
+    ranString = ranString.substring(0, ranString.length - 3)
+    var beginId = new ObjectId(ranString + "000adacefd123000000");
+    var endId = new ObjectId(ranString + "fffadacefd123ffffff");                  
+    // simple findOne on _id with an explicit hint and an explain so we exhaust the cursor and get useful stats back
+    var result = db1.data.findOne({_id : {$gte : beginId, $lte : endId}}).hint({_id : 1});
+    
+}
+
+    	
+}
+
+// this little function will take an ObjectID, then push new IDs to the smallArray until the document moves
+// verbose toggles information about old/new location and number of pushes required (will be more for powerOf2 docs)
+pushUntilMoved = function(dbName, docID, verbose){
+	var db1 = db.getSiblingDB(dbName);
+	var currentLoc = db1.data.find({_id : docID}).showDiskLoc().next().$diskLoc;
+	var newLoc = currentLoc;
+	var pushes = 0;
+	while((currentLoc.file == newLoc.file) && (currentLoc.offset == newLoc.offset)){
+		db1.data.update({_id : docID}, {$push : {smallArray : new ObjectId()}});
+		newLoc = db1.data.find({_id : docID}).showDiskLoc().next().$diskLoc;
+		pushes++;
+	}
+	if(verbose){
+		print("Old location: file: " + currentLoc.file + " offset: " + currentLoc.offset);
+		print("New location: file: " + newLoc.file + " offset: " + newLoc.offset);
+		print("Pushes required: " + pushes);
+    }
+}
+
+
+// delete docs, create holes and a free list
+
+deleteRandomData = function(numGB, dbName){
+	
+}
