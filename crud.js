@@ -104,7 +104,7 @@ while(docHits < (5000000 * numGB)) {
 	// the creation of the string is identical to the creation code
     var randomNum = Math.random();
     var ranString = (Math.floor(randomNum * 1500000000).toString(16)).pad(8, false, 0);
-    // we just strip the last 2 characters to allow us to create ranges - 3 characters is only 4096 seconds
+    // we just strip the last 3 characters to allow us to create ranges - 3 characters is only 4096 seconds
     ranString = ranString.substring(0, ranString.length - 3)
     var beginId = new ObjectId(ranString + "000adacefd123000000");
     var endId = new ObjectId(ranString + "fffadacefd123ffffff");                  
@@ -121,7 +121,7 @@ while(docHits < (5000000 * numGB)) {
         print("Warning: hit rate is poor - just passed " + noHits + " iterations with no hits (current hits doc hits are: " + docHits + " out of " + (5000000 * numGB) + " or " + docHits/(50000 * numGB) + "%).");
 	};
 };
-endTime = new Date();
+var endTime = new Date();
 // some info on the time taken, hit rate etc.
 print(numGB + "GiB of data loaded (" + (numGB * 5000000) + " docs), took " + (endTime - startTime)/1000 + " seconds to complete (average: " + (numGB * 5000000)/((endTime - startTime)/1000) + " docs/sec)")
 print(noHits + " queries hit 0 documents (" + (noHits*100)/iterations + "%) and there were " + iterations + " total iterations." );
@@ -133,11 +133,12 @@ print("Average number of docs scanned per iteration (hits only): " + (numGB * 50
 updateRandomData = function(numGB, dbName, growDocs){
 
 // quick test shows that with powerOf2Sizes, need to add 9 ObjectIds to the smallArray to trigger a move
+// so growing the docs will take a lot more updates in order to complete the run
 // testing for a move is a little clunky, but basically do a push, check the diskLoc
 var db1 = db.getSiblingDB(dbName);
-
+var updateHits = 0;
+var growthOverhead = 0;
 var startTime = new Date(); // time the loop
-
 while(updateHits < (5000000 * numGB)){
     // we'll re-use the logic from the finds, create a range to look for a candidate document
     var randomNum = Math.random();
@@ -145,17 +146,35 @@ while(updateHits < (5000000 * numGB)){
     // we just strip the last 3 characters to allow us to create ranges - 3 characters is only 4096 seconds
     ranString = ranString.substring(0, ranString.length - 3)
     var beginId = new ObjectId(ranString + "000adacefd123000000");
-    var endId = new ObjectId(ranString + "fffadacefd123ffffff");                  
-    // simple findOne on _id with an explicit hint and an explain so we exhaust the cursor and get useful stats back
-    var result = db1.data.findOne({_id : {$gte : beginId, $lte : endId}}).hint({_id : 1});
-    
+    var endId = new ObjectId(ranString + "fffadacefd123ffffff");
+    // simple findOne on _id with an explicit hint
+	var result = 0;
+	// loop until we have a valid result (in case of misses), and we will use the ranInt to not hit docs twice
+	while(result == 0){ 
+        result = db1.data.find({_id : {$gte : beginId, $lte : endId}, ranInt : {$lte : 1000000}}).hint({_id : 1}).next();
+    }
+    if(growDocs){
+        growthOverhead += pushUntilMoved(genTest, result._id, false);
+        db1.data.update({_id : result._id}, {$inc : {ranInt : 1000000}});
+        updateHits++;
+    } else {
+	    db1.data.update({_id : result._id}, {$inc : {ranInt : 1000000}});
+        updateHits++;
+	}
+}
+var endTime = new Date();
+
+if(growDocs){
+    print("Updated " + updateHits + " docs in " + (endTime - startTime)/1000 + " seconds (avg: " + (5000000 * numGB)/((endTime - startTime)/1000) + " docs/sec. Growth required an average of " + (growthOverhead/updateHits) + " pushes to the array.");
+} else {
+    print("Updated " + updateHits + " docs in " + (endTime - startTime)/1000 + " seconds (avg: " + (5000000 * numGB)/((endTime - startTime)/1000) + " docs/sec.");
+};
+
 }
 
-    	
-}
-
-// this little function will take an ObjectID, then push new IDs to the smallArray until the document moves
+// this little function will take an ObjectID, then push new IDs to the smallArray until the document moves on disk
 // verbose toggles information about old/new location and number of pushes required (will be more for powerOf2 docs)
+// it's needed to provide the move functionality in the update function
 pushUntilMoved = function(dbName, docID, verbose){
 	var db1 = db.getSiblingDB(dbName);
 	var currentLoc = db1.data.find({_id : docID}).showDiskLoc().next().$diskLoc;
@@ -171,6 +190,7 @@ pushUntilMoved = function(dbName, docID, verbose){
 		print("New location: file: " + newLoc.file + " offset: " + newLoc.offset);
 		print("Pushes required: " + pushes);
     }
+	return pushes;
 }
 
 
