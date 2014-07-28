@@ -52,7 +52,7 @@ createData = function(numGB, dbName, usePowerOf2) {
             // To explain the document:
             // _id and ranDate are both based on the same randomly generated date, but ranDate has millis and is a bit easier to parse
             // After that we add an integer, boolean and a small array with a string and a number (array is useful for growth later)
-            bigDoc.push({_id : ranId, ranDate : ranDate, ranInt : Math.floor(randomNum * 1000000), ranBool : (randomNum < 0.5 ? true : false), smallArray : [randomNum, randomNum.toString()]});
+            bigDoc.push({_id : ranId, ranDate : ranDate, ranInt : NumberInt(randomNum * 1000000), ranBool : (randomNum < 0.5 ? true : false), smallArray : [randomNum, randomNum.toString()]});
         };
         db1.data.insert(bigDoc);
     
@@ -144,11 +144,12 @@ while(updateHits < (5000000 * numGB)){
     var randomNum = Math.random();
     var ranString = (Math.floor(randomNum * 1500000000).toString(16)).pad(8, false, 0);
     // we just strip the last 3 characters to allow us to create ranges - 3 characters is only 4096 seconds
+    // this is looking pretty inefficient at finding data in a 2GB data set for testing, may need to increase the ranges
     ranString = ranString.substring(0, ranString.length - 3)
     var beginId = new ObjectId(ranString + "000adacefd123000000");
     var endId = new ObjectId(ranString + "fffadacefd123ffffff");
-    // simple findOne on _id with an explicit hint
 	var result = 0;
+    // simple find on _id with a hint and next() to get the first doc off the cursor
 	// loop until we have a valid result (in case of misses), and we will use the ranInt to not hit docs twice
 	while(result == 0){ 
         result = db1.data.find({_id : {$gte : beginId, $lte : endId}, ranInt : {$lte : 1000000}}).hint({_id : 1}).next();
