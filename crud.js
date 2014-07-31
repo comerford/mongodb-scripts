@@ -198,5 +198,22 @@ pushUntilMoved = function(dbName, docID, verbose){
 // delete docs, create holes and a free list
 
 deleteRandomData = function(numGB, dbName){
+	var db1 = db.getSiblingDB(dbName);
+	var delHits = 0; 
+	
+	// this one is actually far more simple in 2.6 with the write results, so writing that first, may not bother with 2.4
+ 	var startTime = new Date(); // time the loop
+	while(delHits < (5000000 * numGB)){
+	// we'll re-use the logic from the finds/updates, create a range to look for a candidate document
+	    var randomNum = Math.random();
+	    var ranString = (Math.floor(randomNum * 1500000000).toString(16)).pad(8, false, 0);
+	    ranString = ranString.substring(0, ranString.length - 3)
+	    var beginId = new ObjectId(ranString + "000adacefd123000000");
+	    var endId = new ObjectId(ranString + "fffadacefd123ffffff");
+		var result = db1.data.remove({_id : {$gte : beginId, $lte : endId}}, 1); // just remove one doc at a time
+		delHits += result.nRemoved;
+    }
+    var endTime = new Date();
+	print("Removed " + delHits + " docs in " + (endTime - startTime)/1000 + " seconds (avg: " + (5000000 * numGB)/((endTime - startTime)/1000) + " docs/sec."); 	
 	
 }
