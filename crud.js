@@ -9,8 +9,9 @@
 // numGB is the approximate data size to create in GiB (integer usually, but any number should work)
 // dbName is the database to use (defaults to a collection called data)
 // usePowerOf2 is a boolean to allow you to select the storage strategy
+// delay is optional - it will introduce a sleep into the loop to slow down the operations, defaults to 0
 
-createData = function(numGB, dbName, usePowerOf2) {
+createData = function(numGB, dbName, usePowerOf2, delay) {
     var db1 = db.getSiblingDB(dbName);
     // set powerOf2 per the boolean, but need to handle it differently if it currently exists or not 
     // NOTE that second option will turn it off for all new collections
@@ -20,7 +21,8 @@ createData = function(numGB, dbName, usePowerOf2) {
     } else {
         db1.adminCommand({ setParameter: 1, newCollectionsUsePowerOf2Sizes: usePowerOf2 });
     };
-    
+    // set the delay as passed in, with the default of 0 as a fallback
+    delay = typeof delay !== 'undefined' ? delay : 0;
     // check the shell version, if 2.5+ set legacy mode for unacked writes (for speed)
     var shellVersion = version().split('.').map(Number);
     if ( shellVersion[0] > 2 ) {
@@ -53,6 +55,10 @@ createData = function(numGB, dbName, usePowerOf2) {
             // _id and ranDate are both based on the same randomly generated date, but ranDate has millis and is a bit easier to parse
             // After that we add an integer, boolean and a small array with a string and a number (array is useful for growth later)
             bigDoc.push({_id : ranId, ranDate : ranDate, ranInt : NumberInt(randomNum * 1000000), ranBool : (randomNum < 0.5 ? true : false), smallArray : [randomNum, randomNum.toString()]});
+            // if there is a non-default delay specified, use it
+            if(delay > 0){
+                sleep(delay);
+            }
         };
         db1.data.insert(bigDoc);
     
