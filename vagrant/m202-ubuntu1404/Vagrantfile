@@ -6,8 +6,8 @@ VAGRANTFILE_API_VERSION = "2"
 
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   
-  config.vm.box = "m202-ubuntu1404""
-  config.vm.box_url = "http://mekhar/m202-ubuntu1404.box"
+  config.vm.box = "m202-ubuntu1404"
+  config.vm.box_url = "http://127.0.0.1/~adam/m202-ubuntu1404.box"
 
   config.vm.provision "shell", path: "provisioners/setup.sh"
 
@@ -37,5 +37,5 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
     v.vmx["memsize"] = "2048"
     v.vmx["numvcpus"] = "1"
   end
-
+  config.ssh.username = "m202"
 end
