@@ -9,13 +9,12 @@
 # Options:
 #  
 # -s - size of data files to allocate in MB, not including namespace file (default: 192) 
+# -f - path to fallocate binary (default is to just call the fallocate command, look in PATH)
 # -n - name of database (default: data)
-# -p - where the fallocate command lives (if not in PATH)
 # -d - where to place the files (default: /data/db)
 
 # Error/safety checks
 # 
-# TODO - check for the existence of the fallocate command (if not, then prompt to install util-linux or equivalent)
 # TODO - check for existing files first, if they exist, bail out and carp
 # TODO - check for sufficient free space on target device
 # TODO - add smallfiles option (divide by 4)
@@ -23,7 +22,7 @@
 # set the defaults
 SIZE=192
 NAME="data"
-BINPATH="/usr/bin"
+FBINARY="fallocate"
 DBPATH="/data/db"  
 
 
@@ -34,7 +33,7 @@ while getopts ":s:n:p:d:" opt; do
     ;;
     n) NAME="$OPTARG"
 	;;
-    p) BINPATH="$OPTARG"
+    f) FBINARY="$OPTARG"
 	;;
     d) DBPATH="$OPTARG"
     ;;
@@ -43,11 +42,11 @@ while getopts ":s:n:p:d:" opt; do
   esac
 done
 
-
+command -v $FBINARY >/dev/null || { echo "fallocate command not found in PATH, cannot continue, please install util-linux package or similar, or provide the full path to the command."; exit 1; }
 
 # Create namespace first - always needed
 
-$BINPATH/fallocate -l $((1024 * 1024 * 16)) $DBPATH/$NAME.ns
+$FBINARY -l $((1024 * 1024 * 16)) $DBPATH/$NAME.ns
 
 # calculate the number of files that will be required
 # 4032 is the magic number, anything beyond that will have multiples of 2048
@@ -80,28 +79,28 @@ ALLOCATED=0
 while [ $ALLOCATED -lt $NUMFILES ]; do
   	case $ALLOCATED in
 	0)
-	  $BINPATH/fallocate -l $((1024 * 1024 * 64)) $DBPATH/$NAME.$ALLOCATED
+	  $FBINARY -l $((1024 * 1024 * 64)) $DBPATH/$NAME.$ALLOCATED
 	  ((ALLOCATED++))
 	  ;;
 	1)
-	  $BINPATH/fallocate -l $((1024 * 1024 * 128)) $DBPATH/$NAME.$ALLOCATED
+	  $FBINARY -l $((1024 * 1024 * 128)) $DBPATH/$NAME.$ALLOCATED
 	  ((ALLOCATED++))
 	  ;;  
 	2) 
-	  $BINPATH/fallocate -l $((1024 * 1024 * 256)) $DBPATH/$NAME.$ALLOCATED
-      ((ALLOCATED++))
+	  $FBINARY -l $((1024 * 1024 * 256)) $DBPATH/$NAME.$ALLOCATED
+          ((ALLOCATED++))
 	  ;;  
 	3) 
-	  $BINPATH/fallocate -l $((1024 * 1024 * 512)) $DBPATH/$NAME.$ALLOCATED
-      ((ALLOCATED++))
+	  $FBINARY -l $((1024 * 1024 * 512)) $DBPATH/$NAME.$ALLOCATED
+          ((ALLOCATED++))
 	  ;;  
 	4) 
-	  $BINPATH/fallocate -l $((1024 * 1024 * 1024)) $DBPATH/$NAME.$ALLOCATED
-      ((ALLOCATED++))
+	  $FBINARY -l $((1024 * 1024 * 1024)) $DBPATH/$NAME.$ALLOCATED
+          ((ALLOCATED++))
 	  ;;
 	*) 
-	  $BINPATH/fallocate -l $((1024 * 1024 * 2048)) $DBPATH/$NAME.$ALLOCATED
-      ((ALLOCATED++))
+	  $FBINARY -l $((1024 * 1024 * 2048)) $DBPATH/$NAME.$ALLOCATED
+          ((ALLOCATED++))
 	  ;;
 	esac
 done
